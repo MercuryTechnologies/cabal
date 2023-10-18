@@ -210,7 +210,7 @@ instance Arbitrary ActiveRepoEntry where
 
 instance Arbitrary CombineStrategy where
     arbitrary = arbitraryBoundedEnum
-    shrink    = shrinkBoundedEnum
+    shrink    = UnitTests.Distribution.Client.ArbitraryInstances.shrinkBoundedEnum
 
 -------------------------------------------------------------------------------
 -- AllowNewer
