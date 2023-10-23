@@ -606,7 +606,7 @@ buildOrReplLib mReplFlags verbosity numJobs pkg_descr lbi lib clbi = do
       libTargetDir = componentBuildDir lbi clbi
       whenVanillaLib forceVanilla =
         when (forceVanilla || withVanillaLib lbi)
-      whenProfLib = when (withProfLib lbi)
+      whenProfLib forceProf = when (forceProf || withProfLib lbi)
       whenSharedLib forceShared =
         when (forceShared || withSharedLib lbi)
       whenStaticLib forceStatic =
@@ -634,10 +634,12 @@ buildOrReplLib mReplFlags verbosity numJobs pkg_descr lbi lib clbi = do
   cleanedExtraLibDirsStatic <- filterM doesDirectoryExist (extraLibDirsStatic libBi)
 
   let isGhcDynamic = isDynamic comp
+      isGhcProfiled = isProfiled comp
       dynamicTooSupported = supportsDynamicToo comp
       doingTH = usesTemplateHaskellOrQQ libBi
-      forceVanillaLib = doingTH && not isGhcDynamic
-      forceSharedLib = doingTH && isGhcDynamic
+      forceVanillaLib = doingTH && not isGhcDynamic && not isGhcProfiled
+      forceSharedLib = doingTH && isGhcDynamic && not isGhcProfiled
+      forceProfiledLib = doingTH && isGhcProfiled
   -- TH always needs default libs, even when building for profiling
 
   -- Determine if program coverage should be enabled and if so, what
@@ -772,27 +774,34 @@ buildOrReplLib mReplFlags verbosity numJobs pkg_descr lbi lib clbi = do
               && (forceVanillaLib || withVanillaLib lbi)
               && (forceSharedLib || withSharedLib lbi)
               && null (hcSharedOptions GHC libBi)
-      if not has_code
-        then vanilla
-        else
-          if useDynToo
-            then do
-              runGhcProg vanillaSharedOpts
-              case (hpcdir Hpc.Dyn, hpcdir Hpc.Vanilla) of
-                (Flag dynDir, Flag vanillaDir) ->
-                  -- When the vanilla and shared library builds are done
-                  -- in one pass, only one set of HPC module interfaces
-                  -- are generated. This set should suffice for both
-                  -- static and dynamically linked executables. We copy
-                  -- the modules interfaces so they are available under
-                  -- both ways.
-                  copyDirectoryRecursive verbosity dynDir vanillaDir
-                _ -> return ()
-            else
-              if isGhcDynamic
-                then do shared; vanilla
-                else do vanilla; shared
-      whenProfLib (runGhcProg profOpts)
+
+          buildVanillaShared =
+            if not has_code
+              then vanilla
+              else
+                if useDynToo
+                  then do
+                    runGhcProg vanillaSharedOpts
+                    case (hpcdir Hpc.Dyn, hpcdir Hpc.Vanilla) of
+                      (Flag dynDir, Flag vanillaDir) ->
+                        -- When the vanilla and shared library builds are done
+                        -- in one pass, only one set of HPC module interfaces
+                        -- are generated. This set should suffice for both
+                        -- static and dynamically linked executables. We copy
+                        -- the modules interfaces so they are available under
+                        -- both ways.
+                        copyDirectoryRecursive verbosity dynDir vanillaDir
+                      _ -> return ()
+                  else
+                    if isGhcDynamic
+                      then do shared; vanilla
+                      else do vanilla; shared
+
+          buildProfiled = whenProfLib forceProfiledLib (runGhcProg profOpts)
+
+      if isGhcProfiled
+        then do buildProfiled; buildVanillaShared
+        else do buildVanillaShared; buildProfiled
 
   let
     buildExtraSources mkSrcOpts wantDyn = traverse_ $ buildExtraSource mkSrcOpts wantDyn
@@ -834,7 +843,7 @@ buildOrReplLib mReplFlags verbosity numJobs pkg_descr lbi lib clbi = do
       unless (forRepl || not wantDyn) $
         whenSharedLib forceSharedLib (runGhcProgIfNeeded sharedSrcOpts)
       unless forRepl $
-        whenProfLib (runGhcProgIfNeeded profSrcOpts)
+        whenProfLib forceProfiledLib (runGhcProgIfNeeded profSrcOpts)
 
   -- Build any C++ sources separately.
   unless (not has_code || null (cxxSources libBi)) $ do
@@ -1077,7 +1086,7 @@ buildOrReplLib mReplFlags verbosity numJobs pkg_descr lbi lib clbi = do
             ghciLibFilePath
             staticObjectFiles
 
-      whenProfLib $ do
+      whenProfLib False $ do
         Ar.createArLibArchive verbosity lbi profileLibFilePath profObjectFiles
         whenGHCiLib $ do
           (ldProg, _) <- requireProgram verbosity ldProgram (withPrograms lbi)
@@ -2427,6 +2436,9 @@ pkgRoot verbosity lbi = pkgRoot'
 
 isDynamic :: Compiler -> Bool
 isDynamic = Internal.ghcLookupProperty "GHC Dynamic"
+
+isProfiled :: Compiler -> Bool
+isProfiled = Internal.ghcLookupProperty "GHC Profiled"
 
 supportsDynamicToo :: Compiler -> Bool
 supportsDynamicToo = Internal.ghcLookupProperty "Support dynamic-too"
