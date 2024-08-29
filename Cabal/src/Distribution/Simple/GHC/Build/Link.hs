@@ -99,6 +99,7 @@ linkOrLoadComponent
       isIndef = componentIsIndefinite clbi
       mbWorkDir = mbWorkDirLBI lbi
       responseFileDir = coerceSymbolicPath buildTargetDir
+      tempFileOptions = commonSetupTempFileOptions $ buildingWhatCommonFlags what
 
       -- See Note [Symbolic paths] in Distribution.Utils.Path
       i = interpretSymbolicPathLBI lbi
@@ -204,6 +205,7 @@ linkOrLoadComponent
               "ghc.rsp"
               Nothing
               responseFileDir
+              tempFileOptions
               verbosity
               ghcProg
               comp
@@ -748,12 +750,14 @@ runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target responseFileDir =
       common = configCommonFlags $ configFlags lbi
       mbWorkDir = mbWorkDirLBI lbi
       verbosity = fromFlag $ setupVerbosity common
+      tempFileOptions = commonSetupTempFileOptions common
    in case replOptionsFlagOutput (replReplOptions rflags) of
         NoFlag ->
           runGHCWithResponseFile
             "ghc.rsp"
             Nothing
             responseFileDir
+            tempFileOptions
             verbosity
             ghcProg
             comp

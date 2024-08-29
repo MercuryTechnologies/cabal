@@ -23,6 +23,7 @@ import Distribution.Simple.GHC.Build.Modules
 import Distribution.Simple.GHC.Build.Utils
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program.Types
+import Distribution.Simple.Setup.Common (commonSetupTempFileOptions)
 import Distribution.System (Arch (JavaScript), Platform (..))
 import Distribution.Types.ComponentLocalBuildInfo
 import Distribution.Utils.Path
@@ -177,11 +178,13 @@ buildExtraSources
         comp = compiler lbi
         platform = hostPlatform lbi
         responseFileDir = coerceSymbolicPath buildTargetDir
+        tempFileOptions = commonSetupTempFileOptions $ buildingWhatCommonFlags buildingWhat
         runGhcProg =
           runGHCWithResponseFile
             "ghc.rsp"
             Nothing
             responseFileDir
+            tempFileOptions
             verbosity
             ghcProg
             comp

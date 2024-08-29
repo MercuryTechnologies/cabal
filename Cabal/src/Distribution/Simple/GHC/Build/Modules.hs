@@ -150,11 +150,13 @@ buildHaskellModules numJobs ghcProg mbMainFile inputModules buildTargetDir neede
 
     mbWorkDir = mbWorkDirLBI lbi
     responseFileDir = coerceSymbolicPath buildTargetDir
+    tempFileOptions = commonSetupTempFileOptions $ buildingWhatCommonFlags what
     runGhcProg =
       runGHCWithResponseFile
         "ghc.rsp"
         Nothing
         responseFileDir
+        tempFileOptions
         verbosity
         ghcProg
         comp

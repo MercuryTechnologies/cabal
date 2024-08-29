@@ -85,7 +85,6 @@ import Distribution.Simple.Setup
   , HaddockProjectFlags (..)
   , HaddockTarget (..)
   , Visibility (..)
-  , defaultCommonSetupFlags
   , defaultHaddockFlags
   , haddockProjectCommand
   )
@@ -121,7 +120,7 @@ haddockProjectAction flags _extraArgs globalFlags = do
 
   -- build all packages with appropriate haddock flags
   let commonFlags =
-        defaultCommonSetupFlags
+        (haddockProjectCommonFlags flags)
           { setupVerbosity = haddockProjectVerbosity flags
           }
       haddockFlags =
@@ -158,7 +157,6 @@ haddockProjectAction flags _extraArgs globalFlags = do
               if localStyle
                 then Flag (toPathTemplate "../doc-index.html")
                 else NoFlag
-          , haddockKeepTempFiles = haddockProjectKeepTempFiles flags
           , haddockResourcesDir = haddockProjectResourcesDir flags
           , haddockUseUnicode = haddockProjectUseUnicode flags
           -- NOTE: we don't pass `haddockOutputDir`. If we do, we'll need to

@@ -36,7 +36,7 @@ import Distribution.Simple.Program.Find (getExtraPathEnv)
 import Distribution.Simple.Program.ResponseFile
 import Distribution.Simple.Program.Run
 import Distribution.Simple.Program.Types
-import Distribution.Simple.Utils (defaultTempFileOptions)
+import Distribution.Simple.Utils (TempFileOptions)
 import Distribution.System
 import Distribution.Types.ComponentId
 import Distribution.Types.ParStrat
@@ -645,6 +645,7 @@ runGHCWithResponseFile
   :: FilePath
   -> Maybe TextEncoding
   -> SymbolicPath Pkg (Dir Response)
+  -> TempFileOptions
   -> Verbosity
   -> ConfiguredProgram
   -> Compiler
@@ -652,7 +653,7 @@ runGHCWithResponseFile
   -> Maybe (SymbolicPath CWD (Dir Pkg))
   -> GhcOptions
   -> IO ()
-runGHCWithResponseFile fileNameTemplate encoding responseFileDir verbosity ghcProg comp platform maybeWorkDir opts = do
+runGHCWithResponseFile fileNameTemplate encoding responseFileDir tempFileOptions verbosity ghcProg comp platform maybeWorkDir opts = do
   invocation <- ghcInvocation verbosity ghcProg comp platform maybeWorkDir opts
 
   -- Don't use response files if the first argument is `--interactive`, for
@@ -686,7 +687,7 @@ runGHCWithResponseFile fileNameTemplate encoding responseFileDir verbosity ghcPr
 
       withResponseFile
         verbosity
-        defaultTempFileOptions
+        tempFileOptions
         maybeWorkDir
         responseFileDir
         fileNameTemplate
