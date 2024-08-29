@@ -77,6 +77,7 @@ linkOrLoadComponent ghcProg pkg_descr extraSources (buildTargetDir, targetDir) (
     lbi = localBuildInfo pbci
     bi = buildBI pbci
     clbi = buildCLBI pbci
+    responseFileDir = buildTargetDir
 
   -- ensure extra lib dirs exist before passing to ghc
   cleanedExtraLibDirs <- liftIO $ filterM doesDirectoryExist (extraLibDirs bi)
@@ -152,10 +153,25 @@ linkOrLoadComponent ghcProg pkg_descr extraSources (buildTargetDir, targetDir) (
       -- exports.
       when (case component of CLib lib -> null (allLibModules lib clbi); _ -> False) $
         warn verbosity "No exposed modules"
-      runReplOrWriteFlags ghcProg lbi replFlags replOpts (pkgName (PD.package pkg_descr)) target
+      runReplOrWriteFlags
+        ghcProg
+        lbi
+        replFlags
+        replOpts
+        (pkgName (PD.package pkg_descr))
+        target
+        responseFileDir
     _otherwise ->
       let
-        runGhcProg = runGHC verbosity ghcProg comp platform
+        runGhcProg =
+          runGHCWithResponseFile
+            "ghc.rsp"
+            Nothing
+            responseFileDir
+            verbosity
+            ghcProg
+            comp
+            platform
         platform = hostPlatform lbi
         comp = compiler lbi
        in
@@ -622,14 +638,24 @@ runReplOrWriteFlags
   -> GhcOptions
   -> PackageName
   -> TargetInfo
+  -> FilePath
   -> IO ()
-runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target =
+runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target responseFileDir =
   let bi = componentBuildInfo $ targetComponent target
       clbi = targetCLBI target
       comp = compiler lbi
       platform = hostPlatform lbi
    in case replOptionsFlagOutput (replReplOptions rflags) of
-        NoFlag -> runGHC (fromFlag $ replVerbosity rflags) ghcProg comp platform ghcOpts
+        NoFlag ->
+          runGHCWithResponseFile
+            "ghc.rsp"
+            Nothing
+            responseFileDir
+            (fromFlag $ replVerbosity rflags)
+            ghcProg
+            comp
+            platform
+            ghcOpts
         Flag out_dir -> do
           src_dir <- getCurrentDirectory
           let uid = componentUnitId clbi
