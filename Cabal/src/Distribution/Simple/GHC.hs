@@ -94,6 +94,7 @@ import Distribution.Pretty
 import Distribution.Simple.Build.Inputs (PreBuildComponentInputs (..))
 import Distribution.Simple.BuildPaths
 import Distribution.Simple.Compiler
+import {-# SOURCE #-} Distribution.Simple.Configure
 import Distribution.Simple.Errors
 import Distribution.Simple.Flag (Flag (..), toFlag)
 import qualified Distribution.Simple.GHC.Build as GHC
@@ -111,10 +112,13 @@ import Distribution.Simple.Program.GHC
 import qualified Distribution.Simple.Program.HcPkg as HcPkg
 import qualified Distribution.Simple.Program.Strip as Strip
 import Distribution.Simple.Setup.Common (extraCompilationArtifacts)
+import Distribution.Simple.Setup.Config (ConfigFlags(..))
 import Distribution.Simple.Setup.Repl
 import Distribution.Simple.Utils
 import Distribution.System
 import Distribution.Types.ComponentLocalBuildInfo
+import Distribution.Types.LocalBuildConfig (LocalBuildDescr(..))
+import qualified Distribution.Types.LocalBuildConfig  as LocalBuildConfig
 import Distribution.Types.ParStrat
 import Distribution.Types.TargetInfo
 import Distribution.Utils.NubList
@@ -711,10 +715,11 @@ libAbiHash verbosity _pkg_descr lbi lib clbi = do
 
   (ghcProg, _) <- requireProgram verbosity ghcProgram (withPrograms lbi)
 
-  hash <-
-    getProgramInvocationOutput
-      verbosity
-      =<< ghcInvocation verbosity ghcProg comp platform ghcArgs
+  distDir <- findDistPrefOrDefault (configDistPref (LocalBuildConfig.configFlags (packageBuildDescr (localBuildDescr lbi))))
+
+  invocation <- ghcInvocation verbosity ghcProg comp platform ghcArgs
+
+  hash <- doWithResponseFile "ghc.rsp" Nothing distDir verbosity (getProgramInvocationOutput verbosity) invocation
 
   return (takeWhile (not . isSpace) hash)
 
