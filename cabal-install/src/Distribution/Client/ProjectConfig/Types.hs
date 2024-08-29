@@ -173,6 +173,7 @@ data ProjectConfigBuildOnly = ProjectConfigBuildOnly
   , projectConfigKeepGoing :: Flag Bool
   , projectConfigOfflineMode :: Flag Bool
   , projectConfigKeepTempFiles :: Flag Bool
+  -- ^ Despite the name (and the type), this only applies to Haddock builds.
   , projectConfigHttpTransport :: Flag String
   , projectConfigIgnoreExpiry :: Flag Bool
   , projectConfigCacheDir :: Flag FilePath

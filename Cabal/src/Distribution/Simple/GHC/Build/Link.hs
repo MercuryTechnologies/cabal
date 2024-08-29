@@ -98,6 +98,7 @@ linkOrLoadComponent
       clbi = buildCLBI pbci
       isIndef = componentIsIndefinite clbi
       mbWorkDir = mbWorkDirLBI lbi
+      responseFileDir = coerceSymbolicPath buildTargetDir
 
       -- See Note [Symbolic paths] in Distribution.Utils.Path
       i = interpretSymbolicPathLBI lbi
@@ -188,10 +189,26 @@ linkOrLoadComponent
         -- exports.
         when (case component of CLib lib -> null (allLibModules lib clbi); _ -> False) $
           warn verbosity "No exposed modules"
-        runReplOrWriteFlags ghcProg lbi replFlags replOpts_final (pkgName (PD.package pkg_descr)) target
+        runReplOrWriteFlags
+          ghcProg
+          lbi
+          replFlags
+          replOpts_final
+          (pkgName (PD.package pkg_descr))
+          target
+          responseFileDir
       _otherwise ->
         let
-          runGhcProg = runGHC verbosity ghcProg comp platform mbWorkDir
+          runGhcProg =
+            runGHCWithResponseFile
+              "ghc.rsp"
+              Nothing
+              responseFileDir
+              verbosity
+              ghcProg
+              comp
+              platform
+              mbWorkDir
           platform = hostPlatform lbi
           comp = compiler lbi
           get_rpaths ways =
@@ -721,8 +738,9 @@ runReplOrWriteFlags
   -> GhcOptions
   -> PackageName
   -> TargetInfo
+  -> SymbolicPath Pkg (Dir Response)
   -> IO ()
-runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target =
+runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target responseFileDir =
   let bi = componentBuildInfo $ targetComponent target
       clbi = targetCLBI target
       comp = compiler lbi
@@ -731,7 +749,17 @@ runReplOrWriteFlags ghcProg lbi rflags ghcOpts pkg_name target =
       mbWorkDir = mbWorkDirLBI lbi
       verbosity = fromFlag $ setupVerbosity common
    in case replOptionsFlagOutput (replReplOptions rflags) of
-        NoFlag -> runGHC verbosity ghcProg comp platform mbWorkDir ghcOpts
+        NoFlag ->
+          runGHCWithResponseFile
+            "ghc.rsp"
+            Nothing
+            responseFileDir
+            verbosity
+            ghcProg
+            comp
+            platform
+            mbWorkDir
+            ghcOpts
         Flag out_dir -> do
           let uid = componentUnitId clbi
               this_unit = prettyShow uid

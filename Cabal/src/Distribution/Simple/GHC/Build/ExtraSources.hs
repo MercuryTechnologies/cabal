@@ -176,7 +176,17 @@ buildExtraSources
         sources = viewSources (targetComponent targetInfo)
         comp = compiler lbi
         platform = hostPlatform lbi
-        runGhcProg = runGHC verbosity ghcProg comp platform
+        responseFileDir = coerceSymbolicPath buildTargetDir
+        runGhcProg =
+          runGHCWithResponseFile
+            "ghc.rsp"
+            Nothing
+            responseFileDir
+            verbosity
+            ghcProg
+            comp
+            platform
+            mbWorkDir
 
         buildAction :: SymbolicPath Pkg File -> IO ()
         buildAction sourceFile = do
@@ -219,7 +229,7 @@ buildExtraSources
               compileIfNeeded :: GhcOptions -> IO ()
               compileIfNeeded opts = do
                 needsRecomp <- checkNeedsRecompilation mbWorkDir sourceFile opts
-                when needsRecomp $ runGhcProg mbWorkDir opts
+                when needsRecomp $ runGhcProg opts
 
           createDirectoryIfMissingVerbose verbosity True (i odir)
           case targetComponent targetInfo of
@@ -251,6 +261,7 @@ buildExtraSources
                 DynWay -> compileIfNeeded sharedSrcOpts
                 ProfWay -> compileIfNeeded profSrcOpts
                 ProfDynWay -> compileIfNeeded profSharedSrcOpts
+
       -- build any sources
       if (null sources || componentIsIndefinite clbi)
         then return mempty
