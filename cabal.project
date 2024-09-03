@@ -4,3 +4,8 @@ import: project-cabal/pkgs.config
 import: project-cabal/constraints.config
 
 tests: True
+
+source-repository-package
+  type: git
+  location: git@github.com:9999years/tree-diff.git
+  tag: f2c15b2d78bd7435ccdc5ce346c08bd808dd1e74
