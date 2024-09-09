@@ -15,6 +15,7 @@ module Distribution.Simple.Program.GHC
   , renderGhcOptions
   , runGHC
   , runGHCWithResponseFile
+  , doWithResponseFile
   , packageDbArgsDb
   , normaliseGhcArgs
   ) where
@@ -647,6 +648,17 @@ runGHCWithResponseFile
 runGHCWithResponseFile fileNameTemplate encoding responseFileDir verbosity ghcProg comp platform opts = do
   invocation <- ghcInvocation verbosity ghcProg comp platform opts
 
+  doWithResponseFile fileNameTemplate encoding responseFileDir verbosity (runProgramInvocation verbosity) invocation
+
+doWithResponseFile
+  :: FilePath
+  -> Maybe TextEncoding
+  -> FilePath
+  -> Verbosity
+  -> (ProgramInvocation -> IO a)
+  -> ProgramInvocation
+  -> IO a
+doWithResponseFile fileNameTemplate encoding responseFileDir verbosity onInvocation invocation = do
   -- Don't use response files if the first argument is `--interactive`, for
   -- two related reasons.
   --
@@ -672,7 +684,7 @@ runGHCWithResponseFile fileNameTemplate encoding responseFileDir verbosity ghcPr
   -- utilities (e.g. `haskell-language-server`) continue working.
   case progInvokeArgs invocation of
     "--interactive" : _ ->
-      runProgramInvocation verbosity invocation
+      onInvocation invocation
     args -> do
       let (rtsArgs, otherArgs) = splitRTSArgs args
 
@@ -693,7 +705,7 @@ runGHCWithResponseFile fileNameTemplate encoding responseFileDir verbosity ghcPr
                  [] -> ""
                  arg : args' -> Process.showCommandForUser arg args'
 
-          runProgramInvocation verbosity newInvocation
+          onInvocation newInvocation
 
 ghcInvocation
   :: Verbosity
