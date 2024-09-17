@@ -32,6 +32,8 @@ normalizeOutput nenv =
      then resub "\\\\(([A-Za-z0-9_]+)(-[A-Za-z0-9\\._]+)*)-[0-9a-f]{4,64}\\\\"
                 "\\\\<PACKAGE>-<HASH>\\\\"
      else id)
+  -- Package versions vary between releases.
+  . resub "(base) (==)([0-9]+)(\\.[0-9]+)*" "\\1 \\2<VERSION>"
   . resub "/(([A-Za-z0-9_]+)(-[A-Za-z0-9\\._]+)*)-[0-9a-f]{4,64}/"
           "/<PACKAGE>-<HASH>/"
     -- This is dumb but I don't feel like pulling in another dep for

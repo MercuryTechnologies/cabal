@@ -12,4 +12,4 @@ Configuring executable 'exe' for Lib-0.1.0.0...
 Error: [Cabal-8010]
 Encountered missing or private dependencies:
     Lib:sublib (missing :sublib),
-    base ==4.20.0.0 (missing component base)
+    base ==<VERSION> (missing component base)
