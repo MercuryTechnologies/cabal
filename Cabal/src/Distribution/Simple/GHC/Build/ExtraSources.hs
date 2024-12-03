@@ -159,7 +159,15 @@ buildExtraSources description componentSourceGhcOptions wantDyn viewSources ghcP
       isGhcDynamic = isDynamic comp
       doingTH = usesTemplateHaskellOrQQ bi
       forceSharedLib = doingTH && isGhcDynamic
-      runGhcProg = runGHC verbosity ghcProg comp platform
+      runGhcProg =
+        runGHCWithResponseFile
+          "ghc.rsp"
+          Nothing
+          buildTargetDir
+          verbosity
+          ghcProg
+          comp
+          platform
 
       buildAction sourceFile = do
         let baseSrcOpts =

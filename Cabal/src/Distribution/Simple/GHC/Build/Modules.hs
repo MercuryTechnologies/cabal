@@ -139,7 +139,15 @@ buildHaskellModules numJobs ghcProg pkg_descr buildTargetDir wantedWays pbci = d
   (inputFiles, inputModules) <- componentInputs buildTargetDir pkg_descr pbci
 
   let
-    runGhcProg = runGHC verbosity ghcProg comp platform
+    runGhcProg =
+      runGHCWithResponseFile
+        "ghc.rsp"
+        Nothing
+        buildTargetDir
+        verbosity
+        ghcProg
+        comp
+        platform
     platform = hostPlatform lbi
 
     -- See Note [Building Haskell Modules accounting for TH]
