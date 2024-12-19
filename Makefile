@@ -31,18 +31,18 @@ FORMAT_DIRS := \
 	bootstrap \
 	buildinfo-reference-generator \
 	Cabal \
-	Cabal-benchmarks \
+	cabal-benchmarks \
 	Cabal-described \
-	Cabal-dev-scripts \
+	cabal-dev-scripts \
 	Cabal-hooks \
 	cabal-install \
 	cabal-install-solver \
 	Cabal-QuickCheck \
 	Cabal-syntax \
 	Cabal-tests \
-	Cabal-testsuite/src \
-	Cabal-testsuite/main \
-	Cabal-testsuite/static \
+	cabal-testsuite/src \
+	cabal-testsuite/main \
+	cabal-testsuite/static \
 	Cabal-tree-diff \
 	cabal-validate \
 	solver-benchmarks
