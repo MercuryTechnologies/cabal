@@ -110,6 +110,7 @@ import Distribution.Utils.NubList
   )
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as M
 import Distribution.Client.Errors
 import Distribution.Client.HttpUtils
@@ -207,6 +208,10 @@ import Distribution.Simple.Utils
   , warn
   )
 import Distribution.Solver.Types.ConstraintSource
+import Distribution.System
+  ( OS (Windows)
+  , buildOS
+  )
 import Distribution.Utils.Path (getSymbolicPath, unsafeMakeSymbolicPath)
 import Distribution.Verbosity
   ( normal
@@ -215,6 +220,7 @@ import Network.URI
   ( URI (..)
   , URIAuth (..)
   , parseURI
+  , uriToString
   )
 import System.Directory
   ( XdgDirectory (XdgCache, XdgConfig, XdgState)
@@ -233,6 +239,11 @@ import System.FilePath
   )
 import System.IO.Error
   ( isDoesNotExistError
+  )
+import System.URI.File
+  ( FileURI (..)
+  , ParseSyntax (..)
+  , parseFileURI
   )
 import Text.PrettyPrint
   ( ($+$)
@@ -1049,12 +1060,12 @@ readConfigFile initial file =
         else ioError ioe
 
 createDefaultConfigFile :: Verbosity -> [String] -> FilePath -> IO SavedConfig
-createDefaultConfigFile verbosity extraLines filePath = do
+createDefaultConfigFile verbosity extraLines filepath = do
   commentConf <- commentSavedConfig
   initialConf <- initialSavedConfig
   extraConf <- parseExtraLines verbosity extraLines
-  notice verbosity $ "Writing default configuration to " ++ filePath
-  writeConfigFile filePath commentConf (initialConf `mappend` extraConf)
+  notice verbosity $ "Writing default configuration to " ++ filepath
+  writeConfigFile filepath commentConf (initialConf `mappend` extraConf)
   return initialConf
 
 writeConfigFile :: FilePath -> SavedConfig -> SavedConfig -> IO ()
@@ -1692,8 +1703,18 @@ postProcessRepo lineno reponameStr repo0 = do
     -- TODO: check that there are no authority, query or fragment
     -- Note: the trailing colon is important
     "file+noindex:" -> do
-      let uri = remoteRepoURI repo0
-      return $ Left $ LocalRepo reponame (uriPath uri) (uriFragment uri == "#shared-cache")
+      -- defer to file-uri package which is more accurate when parsing Windows
+      -- paths
+      let uri' = BS8.pack $ "file:" ++ uriToString id ((remoteRepoURI repo0) { uriScheme = "" }) []
+      case parseFileURI (if buildOS == Windows then ExtendedWindows else ExtendedPosix) uri' of
+        Left{} -> fail $ "Invalid path in URI: " <> show (remoteRepoURI repo0)
+        Right uri'' ->
+            return
+          $ Left
+          $ LocalRepo
+              reponame
+              (BS8.unpack $ filePath uri'')
+              (uriFragment (remoteRepoURI repo0) == "#shared-cache")
     _ -> do
       let repo = repo0{remoteRepoName = reponame}
 
