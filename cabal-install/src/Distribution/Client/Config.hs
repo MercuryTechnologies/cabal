@@ -1705,16 +1705,16 @@ postProcessRepo lineno reponameStr repo0 = do
     "file+noindex:" -> do
       -- defer to file-uri package which is more accurate when parsing Windows
       -- paths
-      let uri' = BS8.pack $ "file:" ++ uriToString id ((remoteRepoURI repo0){uriScheme = ""}) []
+      let uri' = BS8.pack $ "file:" ++ uriToString id ((remoteRepoURI repo0) { uriScheme = "" }) []
       case parseFileURI (if buildOS == Windows then ExtendedWindows else ExtendedPosix) uri' of
         Left{} -> fail $ "Invalid path in URI: " <> show (remoteRepoURI repo0)
         Right uri'' ->
-          return $
-            Left $
-              LocalRepo
-                reponame
-                (BS8.unpack $ filePath uri'')
-                (uriFragment (remoteRepoURI repo0) == "#shared-cache")
+            return
+          $ Left
+          $ LocalRepo
+              reponame
+              (BS8.unpack $ filePath uri'')
+              (uriFragment (remoteRepoURI repo0) == "#shared-cache")
     _ -> do
       let repo = repo0{remoteRepoName = reponame}
 
