@@ -142,7 +142,7 @@ import Distribution.Compat.Directory (listDirectory)
 import Distribution.Compat.Time (getFileAge, getModTime)
 import Distribution.Utils.Generic (fstOf3)
 import Distribution.Utils.Structured (Structured (..), nominalStructure, structuredDecodeFileOrFail, structuredEncodeFile)
-import System.Directory (doesDirectoryExist, doesFileExist, makeAbsolute)
+import System.Directory (doesDirectoryExist, doesFileExist)
 import System.FilePath
   ( normalise
   , splitDirectories
@@ -900,9 +900,7 @@ withIndexEntries verbosity (RepoIndex _repoCtxt (RepoLocalNoIndex (LocalRepo nam
             entries
         case tarballPackageDescription of
           Just ce -> return (Just ce)
-          Nothing -> do
-            tarFile' <- makeAbsolute tarFile
-            dieWithException verbosity $ CannotReadCabalFile expectFilename tarFile'
+          Nothing -> dieWithException verbosity $ CannotReadCabalFile expectFilename tarFile
 
   let (prefs, gpds) =
         partitionEithers $
@@ -977,8 +975,7 @@ withIndexEntries verbosity (RepoIndex _repoCtxt (RepoLocalNoIndex (LocalRepo nam
                     -- Here we show the _failure_ to parse the `.cabal` file as
                     -- a warning. This will impact which versions/packages are
                     -- available in your index, so users should know!
-                    tarFile' <- makeAbsolute tarFile
-                    warn verbosity $ "In " <> tarFile' <> ": " <> displayException exception
+                    warn verbosity $ "In " <> tarFile <> ": " <> displayException exception
                     pure Nothing
                   Right genericPackageDescription ->
                     pure $ Just $ CacheGPD genericPackageDescription bytes

@@ -608,15 +608,11 @@ withRepoNoUpdate repo_dir m = do
     withReaderT (\env' -> env' { testHaveRepo = True }) m
     -- TODO: Arguably should undo everything when we're done...
   where
-    repoUri env ="file+noindex://"
-      ++ (if isWindows
-           -- Windows paths need a preceeding slash to be compliant with file
-           -- URI RFCs (8089 and 3986). In particular to be an instance of
-           -- @path-absolute@.
-           then ('/' :) . map (\x -> case x of
-                                       '\\' -> '/'
-                                       _ -> x)
-           else id) (testRepoDir env)
+    repoUri env ="file+noindex://" ++ (if isWindows
+                                        then map (\x -> case x of
+                                            '\\' -> '/'
+                                            _ -> x)
+                                        else id) (testRepoDir env)
 
 -- | Given a directory (relative to the 'testCurrentDir') containing
 -- a series of directories representing packages, generate an

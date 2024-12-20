@@ -198,9 +198,7 @@ repository.
 
 ``cabal`` will construct the index automatically from the
 ``package-name-version.tar.gz`` files in the directory, and will use optional
-corresponding ``package-name-version.cabal`` files as new revisions. Note that
-Windows should use three slashes too, as in
-``file+noindex:///C:/absolute/path/to/directory``.
+corresponding ``package-name-version.cabal`` files as new revisions.
 
 For example, if ``/absolute/path/to/directory`` looks like
 ::
