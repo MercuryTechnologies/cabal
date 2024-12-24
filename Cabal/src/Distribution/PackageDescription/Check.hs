@@ -64,7 +64,6 @@ import Distribution.Simple.Glob
   ( Glob
   , GlobResult (..)
   , globMatches
-  , parseFileGlob
   , runDirFileGlob
   )
 import Distribution.Simple.Utils hiding (findPackageDesc, notice)
@@ -271,8 +270,6 @@ checkGenericPackageDescription
       checkP
         (not . null $ dups names)
         (PackageBuildImpossible $ DuplicateSections dupes)
-      -- PackageDescription checks.
-      checkPackageDescription packageDescription_
       -- Flag names.
       mapM_ checkFlagName genPackageFlags_
 
@@ -465,18 +462,6 @@ checkPackageDescription
     mapM_ (checkPath False "license-file" PathKindFile) licPaths
     mapM_ checkLicFileExist licenseFiles_
 
-    -- § Globs.
-    dataGlobs <- mapM (checkGlob "data-files") dataFiles_
-    extraGlobs <- mapM (checkGlob "extra-source-files") extraSrcFiles_
-    docGlobs <- mapM (checkGlob "extra-doc-files") extraDocFiles_
-    -- We collect globs to feed them to checkMissingDocs.
-
-    -- § Missing documentation.
-    checkMissingDocs
-      (catMaybes dataGlobs)
-      (catMaybes extraGlobs)
-      (catMaybes docGlobs)
-
     -- § Datafield checks.
     checkSetupBuildInfo setupBuildInfo_
     mapM_ checkTestedWith testedWith_
@@ -515,13 +500,26 @@ checkPackageDescription
       (isJust setupBuildInfo_ && buildType pkg /= Custom)
       (PackageBuildWarning NoCustomSetup)
 
+    -- § Globs.
+    dataGlobs <- catMaybes <$> mapM (checkGlob "data-files" ) dataFiles_
+    extraSrcGlobs <- catMaybes <$> mapM (checkGlob "extra-source-files" ) extraSrcFiles_
+    docGlobs <- catMaybes <$> mapM (checkGlob "extra-doc-files" ) extraDocFiles_
+    -- extraGlobs <- catMaybes <$> mapM (checkGlob "extra-files" . getSymbolicPath) extraFiles_
+
     -- Contents.
     checkConfigureExists (buildType pkg)
     checkSetupExists (buildType pkg)
     checkCabalFile (packageName pkg)
-    mapM_ (checkGlobFile specVersion_ "." "extra-source-files") extraSrcFiles_
-    mapM_ (checkGlobFile specVersion_ "." "extra-doc-files") extraDocFiles_
-    mapM_ (checkGlobFile specVersion_ dataDir_ "data-files") dataFiles_
+    extraSrcFilesGlobResults <- mapM (checkGlobFile "." "extra-source-files") extraSrcGlobs
+    extraDocFilesGlobResults <- mapM (checkGlobFile "." "extra-doc-files") docGlobs
+    -- extraFilesGlobResults <- mapM (checkGlobFile "." "extra-files") extraGlobs
+    extraDataFilesGlobResults <- mapM (checkGlobFile dataDir_ "data-files") dataGlobs
+
+    -- § Missing documentation.
+    checkMissingDocs
+      extraDataFilesGlobResults
+      extraSrcFilesGlobResults
+      extraDocFilesGlobResults
     where
       checkNull
         :: Monad m
@@ -830,29 +828,28 @@ checkSetupExists _ =
 
 checkGlobFile
   :: Monad m
-  => CabalSpecVersion
-  -> FilePath -- Glob pattern.
-  -> FilePath -- Folder to check.
+  => FilePath -- Folder to check.
   -> CabalField -- .cabal field we are checking.
-  -> CheckM m ()
-checkGlobFile cv ddir title fp = do
+  -> Glob -- Glob pattern.
+  -> CheckM m [GlobResult FilePath]
+checkGlobFile ddir title parsedGlob = do
   let adjDdir = if null ddir then "." else ddir
       dir
         | title == "data-files" = adjDdir
         | otherwise = "."
-
-  case parseFileGlob cv fp of
-    -- We just skip over parse errors here; they're reported elsewhere.
-    Left _ -> return ()
-    Right parsedGlob -> do
-      liftInt ciPreDistOps $ \po -> do
-        rs <- runDirFileGlobM po dir parsedGlob
-        return $ checkGlobResult title fp rs
+  mpo <- asksCM (ciPreDistOps . ccInterface)
+  case mpo of
+    Nothing ->
+      pure []
+    Just po -> do
+      rs <- liftCM $ runDirFileGlobM po dir parsedGlob
+      mapM_ tellP (checkGlobResult title parsedGlob rs)
+      return rs
 
 -- | Checks for matchless globs and too strict matching (<2.4 spec).
 checkGlobResult
   :: CabalField -- .cabal field we are checking
-  -> FilePath -- Glob pattern (to show the user
+  -> Glob -- Glob pattern (to show the user
   -- which pattern is the offending
   -- one).
   -> [GlobResult FilePath] -- List of glob results.
@@ -861,7 +858,7 @@ checkGlobResult title fp rs = dirCheck ++ catMaybes (map getWarning rs)
   where
     dirCheck
       | all (not . withoutNoMatchesWarning) rs =
-          [PackageDistSuspiciousWarn $ GlobNoMatch title fp]
+          [PackageDistSuspiciousWarn $ GlobNoMatch title (prettyShow fp)]
       | otherwise = []
 
     -- If there's a missing directory in play, since globs in Cabal packages
@@ -880,9 +877,9 @@ checkGlobResult title fp rs = dirCheck ++ catMaybes (map getWarning rs)
     -- suffix. This warning detects when pre-2.4 package descriptions
     -- are omitting files purely because of the stricter check.
     getWarning (GlobWarnMultiDot file) =
-      Just $ PackageDistSuspiciousWarn (GlobExactMatch title fp file)
+      Just $ PackageDistSuspiciousWarn (GlobExactMatch title (prettyShow fp) file)
     getWarning (GlobMissingDirectory dir) =
-      Just $ PackageDistSuspiciousWarn (GlobNoDir title fp dir)
+      Just $ PackageDistSuspiciousWarn (GlobNoDir title (prettyShow fp) dir)
     -- GlobMatchesDirectory is handled elsewhere if relevant;
     -- we can discard it here.
     getWarning (GlobMatchesDirectory _) = Nothing
@@ -984,9 +981,9 @@ pd2gpd pd = gpd
 -- present in our .cabal file.
 checkMissingDocs
   :: Monad m
-  => [Glob] -- data-files globs.
-  -> [Glob] -- extra-source-files globs.
-  -> [Glob] -- extra-doc-files globs.
+  => [[GlobResult FilePath]] -- data-files globs.
+  -> [[GlobResult FilePath]] -- extra-source-files globs.
+  -> [[GlobResult FilePath]] -- extra-doc-files globs.
   -> CheckM m ()
 checkMissingDocs dgs esgs edgs = do
   extraDocSupport <- (>= CabalSpecV1_18) <$> asksCM ccSpecVersion
@@ -1002,11 +999,10 @@ checkMissingDocs dgs esgs edgs = do
 
         -- 2. Realise Globs.
         let realGlob t =
-              concatMap globMatches
-                <$> mapM (runDirFileGlobM ops "") t
-        rgs <- realGlob dgs
-        res <- realGlob esgs
-        red <- realGlob edgs
+              concatMap globMatches t
+        let rgs = realGlob dgs
+        let res = realGlob esgs
+        let red = realGlob edgs
 
         -- 3. Check if anything in 1. is missing in 2.
         let mcs = checkDoc extraDocSupport des (rgs ++ res ++ red)
